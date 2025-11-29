@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Reflex Test Game</title>
+<title>Reflex Game - Final Hard Mode</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
     body {
@@ -11,51 +11,143 @@
         font-family:Arial, sans-serif;
         text-align:center;
     }
+    #menuScreen, #gameScreen {
+        display:none;
+    }
+    #menuScreen.active, #gameScreen.active {
+        display:block;
+    }
     #screen {
         width:100%;
-        height:70vh;
+        height:60vh;
         background:#222;
         display:flex;
         align-items:center;
         justify-content:center;
+        flex-direction:column;
         font-size:40px;
-        color:white;
     }
-    #btn {
+    .menuBtn, #btn {
         width:90%;
         height:80px;
         margin-top:20px;
-        font-size:30px;
+        font-size:28px;
         border:none;
         border-radius:10px;
         background:white;
         color:black;
     }
+    #leaderboard {
+        margin-top:20px;
+        font-size:22px;
+        text-align:left;
+        padding-left:20px;
+    }
 </style>
 </head>
 <body>
 
-<div id="screen">Wait for green...</div>
-<button id="btn" disabled>Tap when green!</button>
+<div id="menuScreen" class="active">
+    <h1>Reflex Game</h1>
+    <button class="menuBtn" onclick="startMode('normal')">Normal Mode</button>
+    <button class="menuBtn" onclick="startMode('hard')">Hard Mode</button>
+
+    <h2>Hard Mode Leaderboard</h2>
+    <div id="leaderboard">Loading...</div>
+</div>
+
+<div id="gameScreen">
+    <select id="modeSelect" style="font-size:26px;">
+        <option value="normal">Normal</option>
+        <option value="hard">Hard</option>
+    </select>
+
+    <div id="screen">Press START</div>
+    <button id="btn">START</button>
+</div>
 
 <script>
+let menuScreen = document.getElementById("menuScreen");
+let gameScreen = document.getElementById("gameScreen");
 let screen = document.getElementById("screen");
 let btn = document.getElementById("btn");
+let modeSelect = document.getElementById("modeSelect");
+let leaderboardBox = document.getElementById("leaderboard");
 
-let startTime = 0;
+let mode = "normal";
 let waiting = false;
+let startTime = 0;
 let results = [];
 let rounds = 0;
+let fakeActive = false;
+
+let leaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+
+function saveLeaderboard() {
+    localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+}
+
+function updateLeaderboard() {
+    if (leaderboard.length === 0) {
+        leaderboardBox.innerHTML = "No hard mode scores yet.";
+        return;
+    }
+    let text = "";
+    leaderboard.slice(0, 10).forEach((score, i) => {
+        text += (i+1) + ". " + score + " ms<br>";
+    });
+    leaderboardBox.innerHTML = text;
+}
+
+updateLeaderboard();
+
+function startMode(selected) {
+    mode = selected;
+    modeSelect.value = mode;
+
+    menuScreen.classList.remove("active");
+    gameScreen.classList.add("active");
+
+    resetGame();
+}
+
+function resetGame() {
+    waiting = false;
+    fakeActive = false;
+    results = [];
+    rounds = 0;
+    screen.style.background = "#222";
+    screen.innerHTML = "Press START";
+    btn.innerHTML = "START";
+    btn.disabled = false;
+}
 
 function startRound() {
     btn.disabled = true;
-    screen.style.background = "#222";
-    screen.innerHTML = "Wait for green...";
     waiting = true;
+    fakeActive = false;
+    screen.style.background = "#222";
+    screen.innerHTML = "Wait...";
 
-    let delay = Math.random() * 2000 + 1000;
+    let delay;
+
+    if (mode === "normal") {
+        delay = Math.random() * 2000 + 1000;
+    } else {
+        delay = Math.random() * 5000 + 1000;
+
+        if (Math.random() < 0.3) {
+            let fakeTime = Math.random() * (delay - 200);
+            setTimeout(() => {
+                fakeActive = true;
+                screen.style.background = "red";
+                screen.innerHTML = "FAKE!";
+            }, fakeTime);
+        }
+    }
 
     setTimeout(() => {
+        fakeActive = false;
         screen.style.background = "green";
         screen.innerHTML = "TAP!";
         btn.disabled = false;
@@ -65,7 +157,29 @@ function startRound() {
 }
 
 btn.onclick = () => {
-    if (waiting) return;
+    if (btn.innerHTML === "START") {
+        btn.innerHTML = "Tap when green!";
+        startRound();
+        return;
+    }
+
+    if (waiting) {
+        if (fakeActive) {
+            let reaction = 1000;
+            results.push(reaction);
+            rounds++;
+
+            screen.style.background = "red";
+            screen.innerHTML = `EARLY!<br>${reaction} ms`;
+
+            btn.disabled = true;
+
+            if (rounds < 5) {
+                setTimeout(startRound, 1500);
+            } else finishGame();
+        }
+        return;
+    }
 
     let reaction = Date.now() - startTime;
     results.push(reaction);
@@ -73,28 +187,38 @@ btn.onclick = () => {
 
     screen.style.background = "#444";
     screen.innerHTML = `Reaction: ${reaction} ms`;
-
     btn.disabled = true;
 
     if (rounds < 5) {
         setTimeout(startRound, 1500);
-    } else {
-        let avg = Math.round(results.reduce((a,b)=>a+b) / results.length);
-        screen.style.background = "blue";
-        screen.innerHTML = `Average: ${avg} ms`;
-        btn.innerHTML = "REPLAY";
-        btn.disabled = false;
-
-        btn.onclick = () => {
-            results = [];
-            rounds = 0;
-            btn.innerHTML = "Tap when green!";
-            startRound();
-        };
-    }
+    } else finishGame();
 };
 
-startRound();
+function finishGame() {
+    let avg = Math.round(results.reduce((a,b)=>a+b) / results.length);
+
+    if (mode === "hard") {
+        leaderboard.push(avg);
+        leaderboard.sort((a,b)=>a-b);
+        saveLeaderboard();
+        updateLeaderboard();
+    }
+
+    screen.style.background = "blue";
+    screen.innerHTML = `Average: ${avg} ms`;
+
+    btn.innerHTML = "Menu";
+    btn.disabled = false;
+
+    btn.onclick = () => {
+        gameScreen.classList.remove("active");
+        menuScreen.classList.add("active");
+        btn.onclick = null;
+        btn.onclick = originalBtn;
+    };
+}
+
+let originalBtn = btn.onclick;
 </script>
 
 </body>
