@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Reflex Test Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body {
+        margin:0;
+        background:black;
+        color:white;
+        font-family:Arial, sans-serif;
+        text-align:center;
+    }
+    #screen {
+        width:100%;
+        height:70vh;
+        background:#222;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:40px;
+        color:white;
+    }
+    #btn {
+        width:90%;
+        height:80px;
+        margin-top:20px;
+        font-size:30px;
+        border:none;
+        border-radius:10px;
+        background:white;
+        color:black;
+    }
+</style>
+</head>
+<body>
+
+<div id="screen">Wait for green...</div>
+<button id="btn" disabled>Tap when green!</button>
+
+<script>
+let screen = document.getElementById("screen");
+let btn = document.getElementById("btn");
+
+let startTime = 0;
+let waiting = false;
+let results = [];
+let rounds = 0;
+
+function startRound() {
+    btn.disabled = true;
+    screen.style.background = "#222";
+    screen.innerHTML = "Wait for green...";
+    waiting = true;
+
+    let delay = Math.random() * 2000 + 1000;
+
+    setTimeout(() => {
+        screen.style.background = "green";
+        screen.innerHTML = "TAP!";
+        btn.disabled = false;
+        startTime = Date.now();
+        waiting = false;
+    }, delay);
+}
+
+btn.onclick = () => {
+    if (waiting) return;
+
+    let reaction = Date.now() - startTime;
+    results.push(reaction);
+    rounds++;
+
+    screen.style.background = "#444";
+    screen.innerHTML = `Reaction: ${reaction} ms`;
+
+    btn.disabled = true;
+
+    if (rounds < 5) {
+        setTimeout(startRound, 1500);
+    } else {
+        let avg = Math.round(results.reduce((a,b)=>a+b) / results.length);
+        screen.style.background = "blue";
+        screen.innerHTML = `Average: ${avg} ms`;
+        btn.innerHTML = "REPLAY";
+        btn.disabled = false;
+
+        btn.onclick = () => {
+            results = [];
+            rounds = 0;
+            btn.innerHTML = "Tap when green!";
+            startRound();
+        };
+    }
+};
+
+startRound();
+</script>
+
+</body>
+</html>
